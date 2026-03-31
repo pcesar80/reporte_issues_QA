@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard QA</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf.2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    body { font-family: Arial; margin: 20px; background: #f5f6fa; }
+    h1 { color: #2f3640; margin: 0; }
+    .proyecto-titulo { font-size: 0.85em; margin-left: 10px; color: #555; }
+    .barra-superior { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .grid-kpi { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px; }
+    .card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    canvas { width: 100% !important; height: 180px !important; max-height: 180px !important; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
+    th { background: #eee; }
+
+    .view { display: none; margin-top: 20px; }
+    .active { display: block; }
+    .tab-button { margin-right: 10px; padding: 5px 10px; cursor: pointer; border-radius: 5px; border: 1px solid #ccc; }
+    .tab-button.active { background-color: #007bff; color: white; border-color: #007bff; }
+  </style>
+</head>
+
+<body>
+
+<h1>
+  📊 Dashboard QA
+  <span id="tituloProyecto" class="proyecto-titulo"></span>
+</h1>
+
+<div class="barra-superior">
+  <input type="file" id="fileInput" accept=".csv">
+  <div>
+    <label><b>Versión:</b></label>
+    <select id="filtroVersion"></select>
+  </div>
+</div>
+
+<div>
+  <button class="tab-button active" onclick="showView('mainView', this)">Indicadores / Top 5</button>
+  <button class="tab-button" onclick="showView('noDateView', this)">Issues sin fecha</button>
+</div>
+
+<div id="mainView" class="view active">
+  <button onclick="exportarPDF()">📄 Exportar PDF (Vista principal)</button>
+
+  <h2>📌 Top 5 tareas más antiguas</h2>
+  <div class="card">
+    <table id="topTareas">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Asunto</th>
+          <th>Estado</th>
+          <th>Días abierta</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <h2>📊 Indicadores</h2>
+  <div class="grid-kpi">
+    <div class="card">
+      <h3>Estado</h3>
+      <table id="tablaEstado"></table>
+      <canvas id="estadoChart"></canvas>
+    </div>
+    <div class="card">
+      <h3>Severidad</h3>
+      <table id="tablaSeveridad"></table>
+      <canvas id="severidadChart"></canvas>
+    </div>
+    <div class="card">
+      <h3>Prioridad</h3>
+      <table id="tablaPrioridad"></table>
+      <canvas id="prioridadChart"></canvas>
+    </div>
+  </div>
+
+  <!-- NUEVO GRAFICO -->
+  <h2>📈 Tiempo invertido por asignado</h2>
+  <div class="card">
+    <canvas id="tiempoChart" style="height: 300px !important;"></canvas>
+  </div>
+
+</div>
+
+<div id="noDateView" class="view">
+  <button onclick="exportarPDF()">📄 Exportar PDF (Issues sin fecha)</button>
+
+  <h2>⚠️ Issues sin fecha de inicio</h2>
+  <div class="card">
+    <table id="tablaSinFecha">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Versión</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+let dataOriginal = [];
+let proyectoActual = "";
+let charts = {};
+
+document.getElementById('fileInput').addEventListener('change', handleFile);
+document.getElementById('filtroVersion').addEventListener('change', aplicarFiltro);
+
+function showView(viewId, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(viewId).classList.add('active');
+  document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function splitCSVLine(line, sep) {
+  const result = []; let current=''; let insideQuotes=false;
+  for(let i=0;i<line.length;i++){
+    const char=line[i];
+    if(char==='"'){insideQuotes=!insideQuotes;}
+    else if(char===sep&&!insideQuotes){result.push(current);current='';}
+    else{current+=char;}
+  }
+  result.push(current); return result;
+}
+
+function parseCSV(text){
+  text=text.replace(/^\uFEFF/,'');
+  const lines=text.split(/\r?\n/).filter(l=>l.trim()!=='');
+  const sep=lines[0].includes(';')?';':',';
+  const headers=lines[0].split(sep).map(h=>h.replace(/"/g,'').trim().toLowerCase());
+  return lines.slice(1).map(line=>{
+    const values=splitCSVLine(line,sep);
+    let obj={};
+    headers.forEach((h,i)=>obj[h]=(values[i]||'').replace(/"/g,'').trim());
+    return obj;
+  });
+}
+
+function parseFecha(f){if(!f)return null;f=f.trim();if(f.includes('/')){const[d,m,y]=f.split('/');return new Date(`${y}-${m}-${d}`);} if(f.includes('.')){const[d,m,y]=f.split('.');return new Date(`${y}-${m}-${d}`);} return new Date(f);}
+
+function handleFile(e){
+  const file=e.target.files[0];
+  const reader=new FileReader();
+  reader.onload=function(event){
+    dataOriginal=parseCSV(event.target.result);
+    cargarFiltroVersion(dataOriginal);
+    procesar(dataOriginal);
+  };
+  reader.readAsText(file);
+}
+
+function cargarFiltroVersion(data){
+  const select=document.getElementById("filtroVersion");
+  const versiones=new Set();
+  data.forEach(t=>{if(t["versión"])versiones.add(t["versión"]);});
+  select.innerHTML='<option value="ALL">Todas</option>';
+  versiones.forEach(v=>select.innerHTML+=`<option value="${v}">${v}</option>`);
+}
+
+function aplicarFiltro(){
+  const version=document.getElementById("filtroVersion").value;
+  let filtrado=dataOriginal;
+  if(version!=="ALL") filtrado=dataOriginal.filter(t=>t["versión"]===version);
+  procesar(filtrado);
+}
+
+function procesar(data){
+  let estado={}, severidad={}, prioridad={};
+  let tareasConFecha=[], issuesSinFecha=[];
+  let tiempoPorAsignado = {};
+  let proyectos=new Set();
+  const estadosCerrados=["closed","cerrado","done","resuelto","resolved"];
+
+  data.forEach(t=>{
+    const id=t.id; if(!id)return;
+
+    if(t.proyecto) proyectos.add(t.proyecto);
+
+    const est=(t.estado||"").trim();
+    const estLower=est.toLowerCase().replace(/\s/g,'');
+    const sev=t.severidad;
+    const pri=t.prioridad;
+
+    if(est) estado[est]=(estado[est]||0)+1;
+    if(sev) severidad[sev]=(severidad[sev]||0)+1;
+    if(pri) prioridad[pri]=(prioridad[pri]||0)+1;
+
+    // NUEVO
+    const asignado = t["asignado a"] || "Sin asignar";
+    const tiempo = t["tiempo invertido"];
+    if (tiempo && !isNaN(parseFloat(tiempo))) {
+      tiempoPorAsignado[asignado] = (tiempoPorAsignado[asignado] || 0) + 1;
+    }
+
+    if(estadosCerrados.includes(estLower)) return;
+
+    const inicio=parseFecha(t["fecha de inicio"]);
+    if(!inicio||isNaN(inicio)){
+      issuesSinFecha.push({id:id,version:t["versión"]||"-",estado:est||"Sin estado"});
+      return;
+    }
+
+    const dias=Math.floor((new Date()-inicio)/86400000);
+    tareasConFecha.push({id,asunto:t.asunto||"-",estado:est||"Sin estado",dias});
+  });
+
+  proyectoActual=Array.from(proyectos).join("_");
+  document.getElementById("tituloProyecto").innerText=proyectoActual;
+
+  tareasConFecha.sort((a,b)=>b.dias-a.dias);
+  document.querySelector("#topTareas tbody").innerHTML=
+    tareasConFecha.slice(0,5).map(t=>`<tr><td>${t.id}</td><td>${t.asunto}</td><td>${t.estado}</td><td>${t.dias}</td></tr>`).join("");
+
+  issuesSinFecha.sort((a,b)=>a.id-b.id);
+  
+  document.querySelector("#tablaSinFecha tbody").innerHTML=
+  issuesSinFecha.map(t=>`
+    <tr>
+      <td>
+        <a href="https://openproject.casademoneda.gob.ar/projects/nuevo-sistema-rrhh/work_packages/${t.id}/relations" target="_blank">
+          ${t.id}
+        </a>
+      </td>
+      <td>${t.version}</td>
+      <td>${t.estado}</td>
+    </tr>
+  `).join("");
+
+  generarTabla("tablaEstado",estado);
+  generarTabla("tablaSeveridad",severidad);
+  generarTabla("tablaPrioridad",prioridad);
+
+  crearGraficoUniforme("estadoChart","severidadChart","prioridadChart",{estado, severidad, prioridad});
+
+  // NUEVO GRAFICO
+  crearGraficoLinea("tiempoChart", tiempoPorAsignado);
+}
+
+function generarTabla(id,data){
+  const table=document.getElementById(id);
+  let html=`<tr><th>Tipo</th><th>Cantidad</th></tr>`;
+  Object.entries(data).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>html+=`<tr><td>${k}</td><td>${v}</td></tr>`);
+  table.innerHTML=html;
+}
+
+function crearGraficoUniforme(id1,id2,id3,datasets){
+  [id1,id2,id3].forEach(id=>{if(charts[id]) charts[id].destroy();});
+  const heights=[id1,id2,id3].map(id=>document.getElementById(id).clientHeight);
+  const minHeight=Math.min(...heights);
+
+  const colores=["#808080","#007bff","#28a745","#ffa500","#ffff00","#ff0000"];
+  const keys=Object.keys(datasets);
+
+  [id1,id2,id3].forEach((id,i)=>{
+    const ctx=document.getElementById(id);
+    ctx.height=minHeight;
+    charts[id]=new Chart(ctx,{
+      type:'pie',
+      data:{ labels:Object.keys(datasets[keys[i]]), datasets:[{data:Object.values(datasets[keys[i]]), backgroundColor:colores}] }
+    });
+  });
+}
+
+// NUEVA FUNCION
+function crearGraficoLinea(id, data) {
+  const ctx = document.getElementById(id);
+  if (charts[id]) charts[id].destroy();
+
+  charts[id] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: Object.keys(data),
+      datasets: [{
+        label: 'Cantidad de issues con tiempo',
+        data: Object.values(data),
+        fill: false,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0 }
+        }
+      }
+    }
+  });
+}
+
+function exportarPDF(){
+  const { jsPDF }=window.jspdf;
+  const dashboard=document.querySelector(".view.active");
+  html2canvas(dashboard,{scale:2}).then(canvas=>{
+    const imgData=canvas.toDataURL("image/png");
+    const pdf=new jsPDF();
+    pdf.addImage(imgData,'PNG',10,10,190,0);
+    pdf.save(`Dashboard_${proyectoActual}.pdf`);
+  });
+}
+</script>
+</body>
+</html>
