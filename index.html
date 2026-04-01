@@ -6,24 +6,88 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf.2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <style>
     body { font-family: Arial; margin: 20px; background: #f5f6fa; }
     h1 { color: #2f3640; margin: 0; }
     .proyecto-titulo { font-size: 0.85em; margin-left: 10px; color: #555; }
-    .barra-superior { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-    .grid-kpi { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px; }
-    .card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    canvas { width: 100% !important; height: 180px !important; max-height: 180px !important; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
-    th { background: #eee; }
+
+    .barra-superior {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .panel-derecho {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 5px;
+    }
+
+    .filtro-version {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .tab-button {
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    .tab-button.active {
+      background-color: #007bff;
+      color: white;
+      border-color: #007bff;
+    }
 
     .view { display: none; margin-top: 20px; }
     .active { display: block; }
-    .tab-button { margin-right: 10px; padding: 5px 10px; cursor: pointer; border-radius: 5px; border: 1px solid #ccc; }
-    .tab-button.active { background-color: #007bff; color: white; border-color: #007bff; }
+
+    .grid-kpi {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 180px !important;
+      max-height: 180px !important;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 6px;
+      text-align: center;
+    }
+
+    th { background: #eee; }
   </style>
 </head>
 
@@ -36,19 +100,24 @@
 
 <div class="barra-superior">
   <input type="file" id="fileInput" accept=".csv">
-  <div>
-    <label><b>Versión:</b></label>
-    <select id="filtroVersion"></select>
+
+  <div class="panel-derecho">
+    <div class="filtro-version">
+      <label><b>Versión:</b></label>
+      <select id="filtroVersion"></select>
+    </div>
+
+    <button onclick="exportarPDF()">📄 Exportar PDF</button>
   </div>
 </div>
 
-<div>
+<div class="tabs">
   <button class="tab-button active" onclick="showView('mainView', this)">Indicadores / Top 5</button>
   <button class="tab-button" onclick="showView('noDateView', this)">Issues sin fecha</button>
+  <button class="tab-button" onclick="showView('allIssuesView', this)">Todos los issues</button>
 </div>
 
 <div id="mainView" class="view active">
-  <button onclick="exportarPDF()">📄 Exportar PDF (Vista principal)</button>
 
   <h2>📌 Top 5 tareas más antiguas</h2>
   <div class="card">
@@ -84,24 +153,37 @@
     </div>
   </div>
 
-  <!-- NUEVO GRAFICO -->
-  <h2>📈 Tiempo invertido por asignado</h2>
-  <div class="card">
-    <canvas id="tiempoChart" style="height: 300px !important;"></canvas>
-  </div>
+  <h2>📈 Tiempo por asignado</h2>
+<div class="card">
+  <canvas id="tiempoChart" style="height: 300px !important;"></canvas>
+</div>
 
 </div>
 
 <div id="noDateView" class="view">
-  <button onclick="exportarPDF()">📄 Exportar PDF (Issues sin fecha)</button>
-
-  <h2>⚠️ Issues sin fecha de inicio</h2>
+  <h2>⚠️ Issues sin fecha</h2>
   <div class="card">
     <table id="tablaSinFecha">
       <thead>
         <tr>
           <th>ID</th>
           <th>Versión</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="allIssuesView" class="view">
+  <h2>📋 Todos los issues</h2>
+  <div class="card">
+    <table id="tablaTodos">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Descripción</th>
           <th>Estado</th>
         </tr>
       </thead>
@@ -137,7 +219,6 @@ function splitCSVLine(line, sep) {
 }
 
 function parseCSV(text){
-  text=text.replace(/^\uFEFF/,'');
   const lines=text.split(/\r?\n/).filter(l=>l.trim()!=='');
   const sep=lines[0].includes(';')?';':',';
   const headers=lines[0].split(sep).map(h=>h.replace(/"/g,'').trim().toLowerCase());
@@ -149,17 +230,20 @@ function parseCSV(text){
   });
 }
 
-function parseFecha(f){if(!f)return null;f=f.trim();if(f.includes('/')){const[d,m,y]=f.split('/');return new Date(`${y}-${m}-${d}`);} if(f.includes('.')){const[d,m,y]=f.split('.');return new Date(`${y}-${m}-${d}`);} return new Date(f);}
+function parseFecha(f){
+  if(!f) return null;
+  const [d,m,y]=f.split('/');
+  return new Date(`${y}-${m}-${d}`);
+}
 
 function handleFile(e){
-  const file=e.target.files[0];
   const reader=new FileReader();
-  reader.onload=function(event){
-    dataOriginal=parseCSV(event.target.result);
+  reader.onload=e=>{
+    dataOriginal=parseCSV(e.target.result);
     cargarFiltroVersion(dataOriginal);
     procesar(dataOriginal);
   };
-  reader.readAsText(file);
+  reader.readAsText(e.target.files[0]);
 }
 
 function cargarFiltroVersion(data){
@@ -172,8 +256,7 @@ function cargarFiltroVersion(data){
 
 function aplicarFiltro(){
   const version=document.getElementById("filtroVersion").value;
-  let filtrado=dataOriginal;
-  if(version!=="ALL") filtrado=dataOriginal.filter(t=>t["versión"]===version);
+  const filtrado=version==="ALL"?dataOriginal:dataOriginal.filter(t=>t["versión"]===version);
   procesar(filtrado);
 }
 
@@ -182,7 +265,6 @@ function procesar(data){
   let tareasConFecha=[], issuesSinFecha=[];
   let tiempoPorAsignado = {};
   let proyectos=new Set();
-  const estadosCerrados=["closed","cerrado","done","resuelto","resolved"];
 
   data.forEach(t=>{
     const id=t.id; if(!id)return;
@@ -190,91 +272,96 @@ function procesar(data){
     if(t.proyecto) proyectos.add(t.proyecto);
 
     const est=(t.estado||"").trim();
-    const estLower=est.toLowerCase().replace(/\s/g,'');
-    const sev=t.severidad;
-    const pri=t.prioridad;
+    const estLower = est.toLowerCase().replace(/\s/g,'');
 
     if(est) estado[est]=(estado[est]||0)+1;
+
+    const sev = t.severidad;
+    const pri = t.prioridad;
+
     if(sev) severidad[sev]=(severidad[sev]||0)+1;
     if(pri) prioridad[pri]=(prioridad[pri]||0)+1;
 
-    // NUEVO
+    const estadosCerrados=["closed","cerrado","done"];
+    if(estadosCerrados.includes(estLower)) return;
+
     const asignado = t["asignado a"] || "Sin asignar";
     const tiempo = t["tiempo invertido"];
     if (tiempo && !isNaN(parseFloat(tiempo))) {
       tiempoPorAsignado[asignado] = (tiempoPorAsignado[asignado] || 0) + 1;
     }
 
-    if(estadosCerrados.includes(estLower)) return;
-
     const inicio=parseFecha(t["fecha de inicio"]);
-    if(!inicio||isNaN(inicio)){
-      issuesSinFecha.push({id:id,version:t["versión"]||"-",estado:est||"Sin estado"});
+    if(!inicio){
+      issuesSinFecha.push({id,version:t["versión"]||"-",estado:est});
       return;
     }
 
     const dias=Math.floor((new Date()-inicio)/86400000);
-    tareasConFecha.push({id,asunto:t.asunto||"-",estado:est||"Sin estado",dias});
+    tareasConFecha.push({id,asunto:t.asunto||"-",estado:est,dias});
   });
 
-  proyectoActual=Array.from(proyectos).join("_");
-  document.getElementById("tituloProyecto").innerText=proyectoActual;
+  document.getElementById("tituloProyecto").innerText=Array.from(proyectos).join("_");
 
-  tareasConFecha.sort((a,b)=>b.dias-a.dias);
   document.querySelector("#topTareas tbody").innerHTML=
-    tareasConFecha.slice(0,5).map(t=>`<tr><td>${t.id}</td><td>${t.asunto}</td><td>${t.estado}</td><td>${t.dias}</td></tr>`).join("");
+    tareasConFecha.sort((a,b)=>b.dias-a.dias).slice(0,5)
+    .map(t=>`<tr><td>${t.id}</td><td>${t.asunto}</td><td>${t.estado}</td><td>${t.dias}</td></tr>`).join("");
 
-  issuesSinFecha.sort((a,b)=>a.id-b.id);
-  
   document.querySelector("#tablaSinFecha tbody").innerHTML=
-  issuesSinFecha.map(t=>`
+    issuesSinFecha.map(t=>`
     <tr>
-      <td>
-        <a href="https://openproject.casademoneda.gob.ar/projects/nuevo-sistema-rrhh/work_packages/${t.id}/relations" target="_blank">
-          ${t.id}
-        </a>
-      </td>
+      <td><a href="https://openproject.casademoneda.gob.ar/projects/nuevo-sistema-rrhh/work_packages/${t.id}/relations" target="_blank">${t.id}</a></td>
       <td>${t.version}</td>
       <td>${t.estado}</td>
-    </tr>
-  `).join("");
+    </tr>`).join("");
+
+  document.querySelector("#tablaTodos tbody").innerHTML=
+    data.map(t=>`
+    <tr>
+      <td><a href="https://openproject.casademoneda.gob.ar/projects/nuevo-sistema-rrhh/work_packages/${t.id}/relations" target="_blank">${t.id}</a></td>
+      <td>${t.asunto||"-"}</td>
+      <td>${t.estado||"-"}</td>
+    </tr>`).join("");
 
   generarTabla("tablaEstado",estado);
   generarTabla("tablaSeveridad",severidad);
   generarTabla("tablaPrioridad",prioridad);
 
-  crearGraficoUniforme("estadoChart","severidadChart","prioridadChart",{estado, severidad, prioridad});
+  crearGraficoUniforme(
+    "estadoChart",
+    "severidadChart",
+    "prioridadChart",
+    {estado, severidad, prioridad}
+  );
 
-  // NUEVO GRAFICO
   crearGraficoLinea("tiempoChart", tiempoPorAsignado);
 }
 
 function generarTabla(id,data){
   const table=document.getElementById(id);
   let html=`<tr><th>Tipo</th><th>Cantidad</th></tr>`;
-  Object.entries(data).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>html+=`<tr><td>${k}</td><td>${v}</td></tr>`);
+  Object.entries(data).forEach(([k,v])=>html+=`<tr><td>${k}</td><td>${v}</td></tr>`);
   table.innerHTML=html;
 }
 
 function crearGraficoUniforme(id1,id2,id3,datasets){
   [id1,id2,id3].forEach(id=>{if(charts[id]) charts[id].destroy();});
-  const heights=[id1,id2,id3].map(id=>document.getElementById(id).clientHeight);
-  const minHeight=Math.min(...heights);
 
   const colores=["#808080","#007bff","#28a745","#ffa500","#ffff00","#ff0000"];
   const keys=Object.keys(datasets);
 
   [id1,id2,id3].forEach((id,i)=>{
     const ctx=document.getElementById(id);
-    ctx.height=minHeight;
     charts[id]=new Chart(ctx,{
       type:'pie',
-      data:{ labels:Object.keys(datasets[keys[i]]), datasets:[{data:Object.values(datasets[keys[i]]), backgroundColor:colores}] }
+      data:{ 
+        labels:Object.keys(datasets[keys[i]]), 
+        datasets:[{data:Object.values(datasets[keys[i]]), backgroundColor:colores}] 
+      }
     });
   });
 }
 
-// NUEVA FUNCION
 function crearGraficoLinea(id, data) {
   const ctx = document.getElementById(id);
   if (charts[id]) charts[id].destroy();
@@ -284,7 +371,7 @@ function crearGraficoLinea(id, data) {
     data: {
       labels: Object.keys(data),
       datasets: [{
-        label: 'Cantidad de issues con tiempo',
+        label: 'Issues',
         data: Object.values(data),
         fill: false,
         tension: 0.3
@@ -292,6 +379,7 @@ function crearGraficoLinea(id, data) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false, // 🔥 CLAVE
       scales: {
         y: {
           beginAtZero: true,
@@ -303,15 +391,19 @@ function crearGraficoLinea(id, data) {
 }
 
 function exportarPDF(){
-  const { jsPDF }=window.jspdf;
-  const dashboard=document.querySelector(".view.active");
+  const { jsPDF } = window.jspdf;
+  const dashboard = document.querySelector(".view.active");
+
+  const hoy = new Date();
+  const fecha = `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
+
   html2canvas(dashboard,{scale:2}).then(canvas=>{
-    const imgData=canvas.toDataURL("image/png");
     const pdf=new jsPDF();
-    pdf.addImage(imgData,'PNG',10,10,190,0);
-    pdf.save(`Dashboard_${proyectoActual}.pdf`);
+    pdf.addImage(canvas.toDataURL("image/png"),'PNG',10,10,190,0);
+    pdf.save(`Dashboard issues ${fecha}.pdf`);
   });
 }
 </script>
+
 </body>
 </html>
