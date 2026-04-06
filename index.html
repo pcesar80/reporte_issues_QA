@@ -21,7 +21,7 @@ h1 { color: #2f3640; margin: 0; }
 
 .logo { height: 50px; }
 
-.proyecto-titulo { font-size: 0.85em; margin-left: 10px; color: #555; }
+.proyecto-titulo { font-size: 0.99em; margin-left: 10px; color: #555; }
 
 .barra-superior {
   display: flex;
@@ -109,6 +109,20 @@ th, td {
 }
 
 th { background: #eee; }
+
+.separador_A {
+  height: 12px;
+  background: transparent;
+  border-bottom: 5px solid #3476bd;
+  margin-bottom: 15px;
+}
+
+.separador_B {
+  height: 2px;
+  background: transparent;
+  border-bottom: 15px solid rgb(255, 255, 255);
+  margin-bottom: 15px;
+}
 </style>
 </head>
 
@@ -120,6 +134,7 @@ th { background: #eee; }
        src="https://raw.githubusercontent.com/pcesar80/reporte_issues_QA/main/LogoCMA.png"
        crossOrigin="anonymous">
 </div>
+<div class="separador_A"></div>
 
 <div class="barra-superior">
   <input type="file" id="fileInput" accept=".csv">
@@ -141,7 +156,7 @@ th { background: #eee; }
 </div>
 
 <div id="mainView" class="view active">
-
+  <div class="separador_B"></div>
 <h2>📌 Top 5 tareas más antiguas</h2>
 <div class="card">
 <table id="topTareas">
