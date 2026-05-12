@@ -68,7 +68,9 @@
       <select id="filtroVersion"></select>
       
     </div>
+    <button onclick="refreshDashboard()">🔄 Refresh</button>
     <button onclick="exportarPDF()">📄 Exportar PDF</button>
+    
   </div>
 </div>
 
@@ -81,15 +83,15 @@
 <div id="mainView" class="view active">
   <div class="separador_B"></div>
 
-  <h2>📌 Top 5 tareas más antiguas</h2>
+  <h2>📌 Top 5 ISSUES más antiguas</h2>
   <div class="card">
     <table id="topTareas">
       <thead>
         <tr>
-          <th style="cursor:pointer" onclick="ordenarTop5(0)">ID ⬍</th>
-          <th style="cursor:pointer" onclick="ordenarTop5(1)">Asunto ⬍</th>
-          <th style="cursor:pointer" onclick="ordenarTop5(2)">Estado ⬍</th>
-          <th style="cursor:pointer" onclick="ordenarTop5(3)">Días abierta ⬍</th>
+          <th style="cursor:pointer" onclick="ordenarTabla('topTareas',0)">ID ⬍</th>
+<th style="cursor:pointer" onclick="ordenarTabla('topTareas',1)">Asunto ⬍</th>
+<th style="cursor:pointer" onclick="ordenarTabla('topTareas',2)">Estado ⬍</th>
+<th style="cursor:pointer" onclick="ordenarTabla('topTareas',3)">Días abierta ⬍</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -121,7 +123,14 @@
   <h2>⚠️ Tareas sin fecha</h2>
   <div class="card">
     <table id="tablaSinFecha">
-      <thead><tr><th>ID</th><th>Tipo</th><th>Estado</th><th>Motivo</th></tr></thead>
+      <thead>
+        <tr>
+        <th style="cursor:pointer" onclick="ordenarTabla('tablaSinFecha',0)">ID ⬍</th>
+        <th style="cursor:pointer" onclick="ordenarTabla('tablaSinFecha',1)">Tipo ⬍</th>
+        <th style="cursor:pointer" onclick="ordenarTabla('tablaSinFecha',2)">Estado ⬍</th>
+        <th style="cursor:pointer" onclick="ordenarTabla('tablaSinFecha',3)">Motivo ⬍</th>
+        </tr>
+        </thead>
       <tbody></tbody>
     </table>
   </div>
@@ -131,7 +140,14 @@
   <h2>📋 Todas las tareas de QA</h2>
   <div class="card">
     <table id="tablaTodos">
-      <thead><tr><th>ID</th><th>Tipo</th><th>Descripción</th><th>Estado</th></tr></thead>
+      <thead>
+        <tr>
+        <th style="cursor:pointer" onclick="ordenarTabla('tablaTodos',0)">ID ⬍</th>
+        <th style="cursor:pointer" onclick="ordenarTabla('tablaTodos',1)">Tipo ⬍</th>
+        <th style="cursor:pointer" onclick="ordenarTabla('tablaTodos',2)">Descripción ⬍</th>
+        <th style="cursor:pointer" onclick="ordenarTabla('tablaTodos',3)">Estado ⬍</th>
+        </tr>
+        </thead>
       <tbody></tbody>
     </table>
   </div>
