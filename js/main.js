@@ -1,30 +1,31 @@
 // ==========================================
-// 🔹 CACHE VERSIONES
-// Para guarda datasets ya filtrados.
+// 🔹 CACHE VERSIONES API
+// Guarda versiones por proyecto.
 // ==========================================
 let cacheVersiones = {};
 
 
 // ==========================================
+// 🔹 CACHE DATASETS
+// Guarda datasets filtrados.
+// ==========================================
+let cacheDatasets = {};
+
+
+// ==========================================
 // 🔹 PROYECTO SELECCIONADO
-// Guarda el ID del proyecto actualmente
-// seleccionado desde el combo.
 // ==========================================
 let proyectoSeleccionado = "";
 
 
 // ==========================================
 // 🔹 DATA ORIGINAL
-// Contiene todos los datos cargados desde
-// CSV o desde la API.
 // ==========================================
 let dataOriginal = [];
 
 
 // ==========================================
 // 🔹 EVENTOS PRINCIPALES
-// - fileInput: carga CSV manual
-// - filtroVersion: filtra datos por versión
 // ==========================================
 document.getElementById('fileInput').addEventListener('change', handleFile);
 
@@ -34,38 +35,20 @@ document.getElementById('filtroVersion').addEventListener('change', aplicarFiltr
 
 // ==========================================
 // 🔹 CALCULAR DIAS HABILES
-// Cuenta únicamente:
-// - lunes
-// - martes
-// - miércoles
-// - jueves
-// - viernes
-//
-// Excluye:
-// - sábados
-// - domingos
 // ==========================================
 function calcularDiasHabiles(fechaInicio){
 
-  const hoy =
-    new Date();
+  const hoy = new Date();
 
   let contador = 0;
 
-  let fecha =
-    new Date(fechaInicio);
+  let fecha = new Date(fechaInicio);
 
   while (fecha <= hoy) {
 
-    const dia =
-      fecha.getDay();
+    const dia = fecha.getDay();
 
-    // ==========================================
-    // 🔹 0 = Domingo
-    // 🔹 6 = Sábado
-    // ==========================================
     if (dia !== 0 && dia !== 6) {
-
       contador++;
     }
 
@@ -80,9 +63,7 @@ function calcularDiasHabiles(fechaInicio){
 
 
 // ==========================================
-// 🔹 CARGA DE ARCHIVO CSV
-// Lee el archivo seleccionado y procesa
-// la información.
+// 🔹 CARGA CSV
 // ==========================================
 function handleFile(e){
 
@@ -90,22 +71,10 @@ function handleFile(e){
 
   r.onload = e => {
 
-    // ==========================================
-    // 🔹 PARSEO CSV
-    // Convierte el contenido del CSV en objetos.
-    // ==========================================
     dataOriginal = parseCSV(e.target.result);
 
-    // ==========================================
-    // 🔹 CARGA FILTRO VERSIONES
-    // Llena el combo con versiones encontradas.
-    // ==========================================
     cargarFiltroVersion(dataOriginal);
 
-    // ==========================================
-    // 🔹 PROCESAMIENTO GENERAL
-    // Genera tablas, métricas y gráficos.
-    // ==========================================
     procesar(dataOriginal);
   };
 
@@ -115,8 +84,7 @@ function handleFile(e){
 
 
 // ==========================================
-// 🔹 FILTRO POR VERSION
-// Filtra datos según la versión seleccionada.
+// 🔹 FILTRO VERSION
 // ==========================================
 function aplicarFiltro(){
 
@@ -124,7 +92,7 @@ function aplicarFiltro(){
     document.getElementById("filtroVersion").value;
 
   procesar(
-    cacheVersiones[v] || []
+    cacheDatasets[v] || []
   );
 }
 
@@ -132,92 +100,38 @@ function aplicarFiltro(){
 
 // ==========================================
 // 🔹 FUNCION PRINCIPAL
-// Procesa datos y genera:
-// - KPIs
-// - tablas
-// - gráficos
 // ==========================================
 function procesar(data){
 
-// ==========================================
-// 🔹 OBJETOS KPI
-// Acumulan métricas para gráficos y tablas.
-// ==========================================
 let estado = {};
 let severidad = {};
 let prioridad = {};
 
-
-// ==========================================
-// 🔹 ARRAYS AUXILIARES
-// tareas: top 5 tareas antiguas
-// sinFecha: inconsistencias de fechas
-// proyectos: listado único de proyectos
-// ==========================================
 let tareas = [];
 let sinFecha = [];
 let proyectos = new Set();
 
-
-// ==========================================
-// 🔹 TIEMPO POR ID Y TIPO
-// Se utiliza para gráfico de tiempo asignado.
-// ==========================================
 let tiempoPorIdTipo = {};
 
-
-// ==========================================
-// 🔹 LISTA DE TIPOS
-// Guarda todos los tipos encontrados.
-// ==========================================
 let tiposSet = new Set();
 
-
-// ==========================================
-// 🔹 TIEMPO TOTAL POR TIPO
-// Acumula horas por tipo de tarea.
-// ==========================================
 let tiempoPorTipo = {};
 
-
-// ==========================================
-// 🔹 RECORRIDO PRINCIPAL
-// Procesa cada registro.
-// ==========================================
 data.forEach(t => {
 
 const id = t.id;
 
-
-// ==========================================
-// 🔹 VALIDACION ID
-// Ignora registros inválidos.
-// ==========================================
 if(!id) return;
 
+const tipoLimpio =
+  (t.tipo || "").toLowerCase().trim();
 
-// ==========================================
-// 🔹 NORMALIZACION TIPO
-// Facilita comparaciones posteriores.
-// ==========================================
-const tipoLimpio = (t.tipo || "").toLowerCase().trim();
+const tipo =
+  t.tipo || "Sin tipo";
 
-const tipo = t.tipo || "Sin tipo";
+const tiempo =
+  parseFloat(t["tiempo invertido"]);
 
-
-// ==========================================
-// 🔹 TIEMPO INVERTIDO
-// Convierte tiempo a número.
-// ==========================================
-const tiempo = parseFloat(t["tiempo invertido"]);
-
-
-// ==========================================
-// 🔹 ACUMULACION DE TIEMPOS
-// Guarda tiempo:
-// - por ID
-// - por tipo
-// ==========================================
 if(!isNaN(tiempo) && tiempo > 0){
 
   tiposSet.add(tipo);
@@ -239,32 +153,16 @@ if(!isNaN(tiempo) && tiempo > 0){
   tiempoPorTipo[tipo] += tiempo;
 }
 
-
-// ==========================================
-// 🔹 LISTADO UNICO DE PROYECTOS
-// ==========================================
 if(t.proyecto){
   proyectos.add(t.proyecto);
 }
 
+const est =
+  (t.estado || "").trim();
 
-// ==========================================
-// 🔹 NORMALIZACION ESTADO
-// ==========================================
-const est = (t.estado || "").trim();
+const estL =
+  est.toLowerCase().replace(/\s/g,'');
 
-const estL = est
-  .toLowerCase()
-  .replace(/\s/g,'');
-
-
-// ==========================================
-// 🔹 KPIs SOLO PARA ISSUES
-// Cuenta:
-// - estado
-// - severidad
-// - prioridad
-// ==========================================
 if(tipoLimpio.includes("issue")){
 
   if(est){
@@ -282,19 +180,12 @@ if(tipoLimpio.includes("issue")){
   }
 }
 
+const inicio =
+  parseFecha(t["fecha de inicio"]);
 
-// ==========================================
-// 🔹 PARSEO FECHAS
-// ==========================================
-const inicio = parseFecha(t["fecha de inicio"]);
+const fin =
+  parseFecha(t["fecha de finalización"]);
 
-const fin = parseFecha(t["fecha de finalización"]);
-
-
-// ==========================================
-// 🔹 VALIDACION TAREAS CERRADAS
-// Detecta inconsistencias de fechas.
-// ==========================================
 if(["closed","cerrado","done"].includes(estL)){
 
   if(!inicio || !fin){
@@ -322,11 +213,6 @@ if(["closed","cerrado","done"].includes(estL)){
   return;
 }
 
-
-// ==========================================
-// 🔹 VALIDACION FECHA INICIO
-// Detecta tareas abiertas sin inicio.
-// ==========================================
 if(!inicio){
 
   sinFecha.push({
@@ -339,12 +225,6 @@ if(!inicio){
   return;
 }
 
-
-// ==========================================
-// 🔹 CALCULO ANTIGÜEDAD
-// Calcula días hábiles abiertos para TOP 5.
-// Excluye sábados y domingos.
-// ==========================================
 if(tipoLimpio.includes("issue")){
 
   const dias =
@@ -360,11 +240,6 @@ if(tipoLimpio.includes("issue")){
 
 });
 
-
-// ==========================================
-// 🔹 TABLA TOP 5
-// Muestra las issues abiertas más antiguas.
-// ==========================================
 document.querySelector("#topTareas tbody").innerHTML =
 
 tareas
@@ -389,11 +264,6 @@ ${t.id}
 
 `).join("");
 
-
-// ==========================================
-// 🔹 TABLA SIN FECHA
-// Muestra tareas inconsistentes.
-// ==========================================
 document.querySelector("#tablaSinFecha tbody").innerHTML =
 
 sinFecha.map(t=>`
@@ -416,11 +286,6 @@ ${t.id}
 
 `).join("");
 
-
-// ==========================================
-// 🔹 TABLA GENERAL
-// Muestra todos los registros cargados.
-// ==========================================
 document.querySelector("#tablaTodos tbody").innerHTML =
 
 data.map(t=>`
@@ -443,11 +308,6 @@ ${t.id}
 
 `).join("");
 
-
-
-// ==========================================
-// 🔹 GENERACION KPIs
-// ==========================================
 generarTabla("tablaEstado", estado);
 
 generarTabla("tablaSeveridad", severidad);
@@ -456,11 +316,6 @@ generarTabla("tablaPrioridad", prioridad);
 
 generarTabla("tablaTiempoTipo", tiempoPorTipo);
 
-
-
-// ==========================================
-// 🔹 GRAFICOS PRINCIPALES
-// ==========================================
 crearGraficoUniforme(
   "estadoChart",
   "severidadChart",
@@ -468,11 +323,6 @@ crearGraficoUniforme(
   {estado,severidad,prioridad}
 );
 
-
-
-// ==========================================
-// 🔹 GRAFICO TIEMPO ASIGNADO
-// ==========================================
 try{
 
   renderGraficoTiempoAsignado({
@@ -490,99 +340,7 @@ try{
 
 
 // ==========================================
-// 🔹 DESCARGA CSV DESDE OPENPROJECT
-// Abre OpenProject y descarga el CSV.
-// ==========================================
-function cargarDesdeOpenProject(){
-
-  alert("⚠️ Recordá: debés estar logueado en OpenProject para poder descargar el CSV");
-
-  const w = window.open(
-    "https://openproject.casademoneda.gob.ar",
-    "_blank"
-  );
-
-  setTimeout(()=>{
-
-    try {
-
-      if(!w || w.closed){
-
-        alert("❌ No se pudo abrir OpenProject. Verificá bloqueador de popups.");
-
-      } else {
-
-        window.open(
-          "https://openproject.casademoneda.gob.ar/projects/nuevo-sistema-rrhh/work_packages.csv?query_id=960",
-          "_blank"
-        );
-      }
-
-    } catch(e){
-
-      alert("⚠️ Error al intentar acceder a OpenProject");
-    }
-
-  },1500);
-}
-
-
-
-// ==========================================
-// 🔹 CONTROL DE ORDENAMIENTO
-// Guarda estado ASC/DESC de cada tabla.
-// ==========================================
-window.ordenTablas = {};
-
-
-// ==========================================
-// 🔹 ORDENAR TABLAS
-// Permite ordenar cualquier tabla por columna.
-// ==========================================
-window.ordenarTabla = function(tablaId, colIndex) {
-
-    const tabla = document.getElementById(tablaId);
-
-    if (!tabla) return;
-
-    const tbody = tabla.querySelector("tbody");
-
-    const filas = Array.from(
-      tbody.querySelectorAll("tr")
-    );
-
-    const key = `${tablaId}_${colIndex}`;
-
-    window.ordenTablas[key] =
-      !window.ordenTablas[key];
-
-    const asc = window.ordenTablas[key];
-
-    filas.sort((a, b) => {
-
-        let A =
-          a.children[colIndex].innerText.trim();
-
-        let B =
-          b.children[colIndex].innerText.trim();
-
-        if (!isNaN(A) && !isNaN(B)) {
-
-            return asc ? A - B : B - A;
-        }
-
-        return asc
-            ? A.localeCompare(B, undefined, { numeric: true })
-            : B.localeCompare(A, undefined, { numeric: true });
-    });
-
-    filas.forEach(f => tbody.appendChild(f));
-};
-
-
-// ==========================================
-// 🔹 CARGA PROYECTOS DESDE API
-// Llena combo de proyectos.
+// 🔹 CARGA PROYECTOS
 // ==========================================
 async function cargarProyectos() {
 
@@ -625,17 +383,99 @@ async function cargarProyectos() {
 
 
 // ==========================================
-// 🔹 CARGA WORK PACKAGES
-// Obtiene tareas desde la API.
+// 🔹 CARGA VERSIONES DESDE API
 // ==========================================
-async function cargarWorkPackages(projectId, recargarVersiones = true){
+async function cargarVersionesProyecto(projectId){
+
+  try {
+
+    const select =
+      document.getElementById("filtroVersion");
+
+    select.innerHTML =
+      '<option value="">Cargando versiones...</option>';
+
+    // ==========================================
+    // 🔹 CACHE
+    // ==========================================
+    if(cacheVersiones[projectId]){
+
+      renderizarVersiones(
+        cacheVersiones[projectId]
+      );
+
+      return;
+    }
+
+    const res =
+      await fetch(`http://localhost:3000/versions?projectId=${projectId}`);
+
+    if(!res.ok){
+      throw new Error("Error cargando versiones");
+    }
+
+    const data =
+      await res.json();
+
+    const versiones =
+      data.map(v => ({
+        id: v.id,
+        nombre: v.nombre
+      }));
+
+    cacheVersiones[projectId] =
+      versiones;
+
+    renderizarVersiones(versiones);
+
+  } catch(e){
+
+    console.error(e);
+
+    alert("Error cargando versiones");
+  }
+}
+
+
+
+// ==========================================
+// 🔹 RENDER VERSIONES
+// ==========================================
+function renderizarVersiones(versiones){
+
+  const select =
+    document.getElementById("filtroVersion");
+
+  select.innerHTML =
+    '<option value="ALL">Todas las versiones</option>';
+
+  versiones.forEach(v => {
+
+    const option =
+      document.createElement("option");
+
+    option.value = v.nombre;
+
+    option.textContent = v.nombre;
+
+    select.appendChild(option);
+  });
+}
+
+
+
+// ==========================================
+// 🔹 CARGA WORK PACKAGES
+// ==========================================
+async function cargarWorkPackages(projectId){
 
   try {
 
     const res =
       await fetch(`http://localhost:3000/workpackages?projectId=${projectId}`);
 
-    const data = await res.json();
+    const data =
+      await res.json();
 
     dataOriginal = data.map(wp => ({
       id: wp.id,
@@ -652,24 +492,24 @@ async function cargarWorkPackages(projectId, recargarVersiones = true){
       link: wp.link
     }));
 
-    cacheVersiones = {
+    // ==========================================
+    // 🔹 CACHE DATASETS
+    // ==========================================
+    cacheDatasets = {
       ALL: dataOriginal
     };
 
     dataOriginal.forEach(t => {
 
-      const v = t["versión"] || "SIN_VERSION";
+      const v =
+        t["versión"] || "SIN_VERSION";
 
-      if(!cacheVersiones[v]){
-        cacheVersiones[v] = [];
+      if(!cacheDatasets[v]){
+        cacheDatasets[v] = [];
       }
 
-      cacheVersiones[v].push(t);
+      cacheDatasets[v].push(t);
     });
-
-    if(recargarVersiones){
-      cargarFiltroVersion(dataOriginal);
-    }
 
     procesar(dataOriginal);
 
@@ -699,8 +539,7 @@ async function refreshDashboard(){
   }
 
   await cargarWorkPackages(
-    proyectoSeleccionado,
-    false
+    proyectoSeleccionado
   );
 
   const filtro =
@@ -731,13 +570,26 @@ document.addEventListener("DOMContentLoaded", () => {
   const select =
     document.getElementById("proyectoSelect");
 
-  select.addEventListener("change", (e) => {
+  select.addEventListener("change", async (e) => {
 
-    proyectoSeleccionado = e.target.value;
+    proyectoSeleccionado =
+      e.target.value;
 
     if (proyectoSeleccionado) {
 
-      cargarWorkPackages(proyectoSeleccionado);
+      // ==========================================
+      // 🔹 CARGA VERSIONES
+      // ==========================================
+      cargarVersionesProyecto(
+        proyectoSeleccionado
+      );
+
+      // ==========================================
+      // 🔹 CARGA WORKPACKAGES
+      // ==========================================
+      cargarWorkPackages(
+        proyectoSeleccionado
+      );
     }
   });
 
